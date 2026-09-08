@@ -21,6 +21,8 @@ def trening_result(result):
     else:
         print("Ты лентяй!!!")
 
+
+
 result = True
 trening_result(result)
 
