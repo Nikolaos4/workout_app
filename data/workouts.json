@@ -1,0 +1,13 @@
+[
+  {
+    "id": 1,
+    "date": "2026-09-07",
+    "type": "силовая",
+    "duration_min": 60,
+    "exercises": [
+      {"exercise_id": 1, "sets": 3, "reps": 8, "weight": 80},
+      {"exercise_id": 2, "sets": 2, "reps": 10, "weight": 100},
+      {"exercise_id": 3, "sets": 4, "reps": 12, "weight": 20}
+    ]
+  }
+]

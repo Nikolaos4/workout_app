@@ -1,0 +1,5 @@
+[
+  {"id": 1, "name": "Жим лёжа", "muscle_group": "Грудь"},
+  {"id": 2, "name": "Присед", "muscle_group": "Ноги"},
+  {"id": 3, "name": "Молотки", "muscle_group": "Бицепс"}
+]
