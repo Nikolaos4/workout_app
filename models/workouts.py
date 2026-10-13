@@ -184,6 +184,22 @@ def get_user_workouts(workouts: list[Workout], user: User) -> list[Workout]:
     return [workout for workout in workouts if workout.user is user]
 
 
+def find_workouts_with_exercise(
+    workouts: list[Workout], exercise: Exercise
+) -> list[Workout]:
+    """Вернуть активные тренировки, в которых выполнялось упражнение.
+
+    Отменённые тренировки не учитываются. Используется веб-страницей
+    упражнения (ПР5).
+    """
+    return [
+        workout
+        for workout in workouts
+        if not workout.is_cancelled
+        and any(item.exercise.id == exercise.id for item in workout.exercises)
+    ]
+
+
 def cancel_workout(workouts: list[Workout], workout_id: int) -> bool:
     """Отменить тренировку по id, не удаляя её из коллекции.
 

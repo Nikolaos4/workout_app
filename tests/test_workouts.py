@@ -16,6 +16,7 @@ from models.workouts import (
     cancel_workout,
     create_workout,
     find_workout_by_id,
+    find_workouts_with_exercise,
     find_workouts_in_period,
     get_user_workouts,
     get_workout_stats,
@@ -203,3 +204,16 @@ def test_reality_task_counts_exercises():
 def test_trening_result_messages():
     assert "= 1" in trening_result(True, 0, make_items())
     assert trening_result(False, 0, []) == "Ты лентяй!!!"
+
+
+def test_find_workouts_with_exercise_ignores_cancelled_and_other_exercises():
+    workouts = []
+    user = make_user()
+    items = make_items()
+    other = [WorkoutExercise(Exercise(2, "Присед", "Ноги"), 3, 8, 80)]
+    active = create_workout(workouts, user, days_ago(1), "силовая", items)
+    cancelled = create_workout(workouts, user, days_ago(2), "силовая", items)
+    create_workout(workouts, user, days_ago(3), "силовая", other)
+    cancel_workout(workouts, cancelled.id)
+    found = find_workouts_with_exercise(workouts, items[0].exercise)
+    assert found == [active]
