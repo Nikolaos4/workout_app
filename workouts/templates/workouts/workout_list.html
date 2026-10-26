@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Тренировки – Сервис учета тренировок
+{% endblock %}
+
+{% block content %}
+    <h1>Тренировки</h1>
+
+    <p>
+        Всего тренировок: {{ workouts|length }}
+    </p>
+
+    <ul class="list-group">
+        {% for workout in workouts %}
+            <li class="list-group-item d-flex justify-content-between">
+                <a href="{% url 'workouts:detail' workout.id %}">
+                    {{ workout.workout_date|date:"d.m.Y" }} –
+                    {{ workout.workout_type }},
+                    {{ workout.user.name }}
+                </a>
+                {% include "workouts/includes/workout_status.html" %}
+            </li>
+        {% empty %}
+            <li class="list-group-item">Тренировок пока нет.</li>
+        {% endfor %}
+    </ul>
+{% endblock %}

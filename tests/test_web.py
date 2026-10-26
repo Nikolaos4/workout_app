@@ -1,6 +1,7 @@
 """Тесты веб-слоя Django: маршруты, страницы и коды ответов."""
 
 from django.test import Client, override_settings
+from django.urls import reverse
 
 
 def get(url: str):
@@ -73,3 +74,43 @@ def test_non_integer_id_does_not_match_route():
     response = get("/exercises/abc/")
     assert response.status_code == 404
     assert "404 – страница не найдена" in response.content.decode()
+
+
+def test_base_template_layout_and_static_files():
+    html = get("/").content.decode()
+    assert html.lstrip().startswith("<!DOCTYPE html>")
+    assert "/static/homepage/css/style.css" in html
+    assert "/static/homepage/js/main.js" in html
+    assert "/static/homepage/img/logo.png" in html
+    assert 'id="current-year"' in html
+
+
+def test_navigation_links_built_from_named_urls():
+    html = get("/").content.decode()
+    assert reverse("homepage:index") == "/"
+    assert reverse("exercises:list") == "/exercises/"
+    assert reverse("workouts:detail", args=[1]) == "/workouts/1/"
+    assert f'href="{reverse("exercises:list")}"' in html
+
+
+def test_exercises_list_uses_include_and_length_filter():
+    html = get("/exercises/").content.decode()
+    assert "Всего упражнений: 3" in html
+    assert 'class="card exercise-card mb-3"' in html
+    assert 'href="/exercises/1/"' in html
+
+
+def test_workout_status_include_shows_active_state():
+    html = get("/workouts/1/").content.decode()
+    assert "активна" in html
+    assert "workout-status-active" in html
+
+
+def test_workout_date_formatted_by_filter():
+    assert "07.09.2026" in get("/workouts/1/").content.decode()
+
+
+def test_views_do_not_build_html_in_python():
+    from homepage import views as homepage_views
+
+    assert not hasattr(homepage_views, "page")

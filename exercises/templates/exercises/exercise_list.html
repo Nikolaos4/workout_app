@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Упражнения – Сервис учета тренировок
+{% endblock %}
+
+{% block content %}
+    <h1>Упражнения</h1>
+
+    <p>
+        Всего упражнений: {{ exercises|length }}
+    </p>
+    
+    {% for exercise in exercises %}
+        {% include "exercises/includes/exercise_card.html" %}
+    {% empty %}
+        <p>Упражнений пока нет.</p>
+    {% endfor %}
+{% endblock %}
+

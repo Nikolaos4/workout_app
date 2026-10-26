@@ -5,7 +5,7 @@
 Приложение для учета тренировок: пользователь записывает тренировки,
 отслеживает прогресс, анализирует нагрузку и видит динамику результатов.
 Консольная версия приложения (ПР1–ПР3) дополнена веб-интерфейсом на Django
-(ПР5).
+(ПР5), страницы которого с ПР6 строятся на шаблонах Django.
 
 Приложение позволяет:
 
@@ -29,8 +29,10 @@
 
 * Python 3;
 * Django 5.2 — веб-фреймворк;
-* HTML — разметка веб-страниц;
-* CSS и Bootstrap 5.3 — оформление страниц (подключение через CDN);
+* Django Template Language (DTL) — шаблоны страниц;
+* HTML5 — разметка веб-страниц;
+* CSS3 и Bootstrap 5.3 — оформление страниц (Bootstrap подключён через CDN);
+* JavaScript — небольшое клиентское поведение (текущий год в подвале);
 * pytest — автоматизированные тесты;
 * flake8 — проверка качества кода;
 * black — форматирование кода.
@@ -93,35 +95,88 @@
 
 ## Страницы веб-интерфейса
 
-| URL | View-функция | Назначение |
-|---|---|---|
-| `/` | `homepage.views.index()` | главная страница: описание и навигация |
-| `/exercises/` | `exercises.views.exercises()` | список упражнений из `data/exercises.json` |
-| `/exercises/<int:exercise_id>/` | `exercises.views.exercise_detail()` | страница упражнения |
-| `/workouts/` | `workouts.views.workouts()` | список тренировок из `data/workouts.json` |
-| `/workouts/<int:workout_id>/` | `workouts.views.workout_detail()` | страница тренировки |
+| URL | Имя маршрута | View-функция | Шаблон |
+|---|---|---|---|
+| `/` | `homepage:index` | `homepage.views.index()` | `homepage/index.html` |
+| `/exercises/` | `exercises:list` | `exercises.views.exercises()` | `exercises/exercise_list.html` |
+| `/exercises/<int:exercise_id>/` | `exercises:detail` | `exercises.views.exercise_detail()` | `exercises/exercise_detail.html` |
+| `/workouts/` | `workouts:list` | `workouts.views.workouts()` | `workouts/workout_list.html` |
+| `/workouts/<int:workout_id>/` | `workouts:detail` | `workouts.views.workout_detail()` | `workouts/workout_detail.html` |
 
 Если упражнение или тренировка с указанным идентификатором не найдены,
 страница возвращает код статуса 404. Для любого адреса, которому не нашлось
 маршрута, срабатывает обработчик `handler404` — собственная страница
-«404 – страница не найдена» (`homepage.views.page_not_found()`).
+«404 – страница не найдена» (`homepage.views.page_not_found()`, шаблон
+`homepage/404.html`).
 
 Маршрутизация двух уровней: корневой `workout_app/urls.py` подключает
 маршруты приложений через `include()`, а конкретные адреса описаны в
 `urls.py` каждого приложения.
 
-## HTML, CSS и Bootstrap
+## Веб-интерфейс и шаблоны Django
 
-Общий каркас всех страниц формирует функция `page(title, content)` из
-`homepage/views.py`: кодировка, заголовок вкладки, подключение
-Bootstrap 5.3, навигация (`nav`) и контейнер (`container`) для содержимого.
-View-функции передают в неё заголовок и HTML содержимого. Используются
-классы Bootstrap: `card`, `list-group`, `badge`, `btn`, `display-4`, `lead`,
-`text-danger` и другие.
+Веб-часть приложения реализована на Django. HTML формируется не в Python-коде,
+а в шаблонах: view-функция получает данные, кладёт их в контекст и вызывает
+`render()`. Функция `page()` из ПР5 больше не используется и удалена.
+
+### Базовый шаблон и наследование
+
+Общая структура всех страниц находится в `templates/base.html`: объявление
+документа, кодировка, заголовок вкладки, Bootstrap, собственный CSS, логотип,
+навигация, контейнер содержимого, подвал и подключение JavaScript. Дочерние
+шаблоны подключают его через `{% extends "base.html" %}` и переопределяют
+блоки `{% block title %}` и `{% block content %}`.
+
+### Включаемые шаблоны
+
+Повторяющиеся фрагменты вынесены в отдельные шаблоны и подключаются через
+`{% include %}`:
+
+* `templates/includes/navigation.html` — навигация (подключена в `base.html`);
+* `exercises/includes/exercise_card.html` — карточка упражнения в списке;
+* `workouts/includes/workout_status.html` — статус тренировки (активна или
+  отменена) в списке и на странице тренировки.
+
+### Контекст, циклы и условия
+
+View-функции передают данные словарём контекста, например
+`{"exercises": exercises_list}`, а шаблон обращается к ним по имени:
+`{% for exercise in exercises %}`. Для пустых коллекций используется
+`{% empty %}`, для разных состояний данных — `{% if %}` (отменённая и активная
+тренировка, наличие или отсутствие объекта на странице детали).
+
+### Именованные URL и пространства имён
+
+В `urls.py` каждого приложения задан `app_name` и имена маршрутов
+(`homepage:index`, `exercises:list`, `exercises:detail`, `workouts:list`,
+`workouts:detail`). Ссылки в шаблонах строятся тегом `{% url %}`, например
+`{% url 'exercises:detail' exercise.id %}`, а не записываются адресом вручную.
+
+### Фильтры шаблонов
+
+* `{{ exercises|length }}` — количество элементов списка;
+* `{{ exercise.name|default:"Без названия" }}` — значение по умолчанию;
+* `{{ workout.workout_date|date:"d.m.Y" }}` — формат даты.
+
+Фильтры отвечают только за представление данных, бизнес-логика остаётся в
+Python-коде (`models/`).
+
+### Статические файлы
+
+Статика находится в `homepage/static/homepage/`: `css/style.css` (собственные
+стили карточек, статуса и логотипа), `js/main.js` (подстановка текущего года в
+подвал), `img/logo.png` (логотип). В шаблонах используются `{% load static %}`
+и `{% static %}`. Bootstrap сохранён для базовой вёрстки, собственный CSS его
+дополняет.
+
+### Данные
+
+Источник данных не изменился: JSON-файлы и объекты классов ПР3 загружаются
+функциями `storage.py`. Django ORM на этом этапе не используется.
 
 ## Основные операции
 
-### Используется в веб-интерфейсе (ПР5)
+### Используется в веб-интерфейсе (ПР5–ПР6)
 
 * просмотр списка упражнений;
 * просмотр информации об упражнении (в скольких активных тренировках оно
@@ -177,12 +232,26 @@ workout_app/
 │   ├── asgi.py
 │   └── wsgi.py
 │
+├── templates/
+│   ├── base.html
+│   └── includes/
+│       └── navigation.html
+│
 ├── homepage/
 │   ├── __init__.py
 │   ├── admin.py
 │   ├── apps.py
 │   ├── migrations/
 │   ├── models.py
+│   ├── static/
+│   │   └── homepage/
+│   │       ├── css/style.css
+│   │       ├── img/logo.png
+│   │       └── js/main.js
+│   ├── templates/
+│   │   └── homepage/
+│   │       ├── 404.html
+│   │       └── index.html
 │   ├── tests.py
 │   ├── urls.py
 │   └── views.py
@@ -193,6 +262,12 @@ workout_app/
 │   ├── apps.py
 │   ├── migrations/
 │   ├── models.py
+│   ├── templates/
+│   │   └── exercises/
+│   │       ├── exercise_detail.html
+│   │       ├── exercise_list.html
+│   │       └── includes/
+│   │           └── exercise_card.html
 │   ├── tests.py
 │   ├── urls.py
 │   └── views.py
@@ -203,6 +278,12 @@ workout_app/
 │   ├── apps.py
 │   ├── migrations/
 │   ├── models.py
+│   ├── templates/
+│   │   └── workouts/
+│   │       ├── workout_detail.html
+│   │       ├── workout_list.html
+│   │       └── includes/
+│   │           └── workout_status.html
 │   ├── tests.py
 │   ├── urls.py
 │   └── views.py
@@ -240,8 +321,8 @@ workout_app/
 
 Пакет настроек Django-проекта:
 
-* `settings.py` — настройки проекта (приложения, язык, часовой пояс, режим
-  отладки, разрешённые хосты);
+* `settings.py` — настройки проекта (приложения, шаблоны — каталог
+  `templates/` в `DIRS`, язык, часовой пояс, режим отладки, разрешённые хосты);
 * `urls.py` — маршрутизация верхнего уровня и `handler404`;
 * `asgi.py`, `wsgi.py` — точки взаимодействия с сервером.
 
@@ -249,23 +330,25 @@ workout_app/
 
 Django-приложение главной страницы:
 
-* `views.py` — функция `page()` (общий HTML-каркас), view-функции `index()`
-  и `page_not_found()`;
-* `urls.py` — маршрут главной страницы.
-
-Функция `page()` размещена здесь, потому что главная страница задаёт общий
-вид всех остальных страниц. Остальные приложения импортируют её.
+* `views.py` — view-функции `index()` и `page_not_found()`;
+* `urls.py` — маршрут главной страницы (`app_name = "homepage"`);
+* `templates/homepage/` — шаблоны главной страницы и страницы 404;
+* `static/homepage/` — общие статические файлы проекта (CSS, JavaScript,
+  логотип).
 
 ### `exercises/`
 
 Django-приложение упражнений: `views.py` — `exercises()` и
-`exercise_detail()`; `urls.py` — маршруты приложения; `models.py` — Django-
+`exercise_detail()`; `urls.py` — маршруты приложения (`app_name = "exercises"`);
+`templates/exercises/` — шаблоны списка, страницы и карточки упражнения; `models.py` — Django-
 модели (заполняется в следующих работах).
 
 ### `workouts/`
 
 Django-приложение тренировок: `views.py` — `workouts()`, `workout_detail()`
-и вспомогательная `load_all_workouts()`; `urls.py` — маршруты приложения;
+и вспомогательная `load_all_workouts()`; `urls.py` — маршруты приложения
+(`app_name = "workouts"`); `templates/workouts/` — шаблоны списка, страницы
+и статуса тренировки;
 `models.py` — Django-модели (заполняется в следующих работах).
 
 Приложение для пользователей не создавалось: пользователь пока не имеет
@@ -276,6 +359,10 @@ Django-приложение тренировок: `views.py` — `workouts()`, `
 
 Классы предметной области и функции работы с ними (пакет ПР3):
 `exercises.py`, `users.py`, `workouts.py`, `results.py`.
+
+### `templates/`
+
+Шаблоны уровня проекта: `base.html` и `includes/navigation.html`.
 
 ### `storage.py`
 
@@ -335,7 +422,7 @@ pytest -v
 Тесты покрывают сущности предметной области (`test_exercises.py`,
 `test_users.py`, `test_workouts.py`, `test_results.py`), загрузку и
 сохранение JSON (`test_storage.py`) и веб-слой: страницы, коды ответов и
-страницу 404 (`test_web.py`).
+страницу 404, базовый шаблон, статику и именованные URL (`test_web.py`).
 
 ## Проверка качества кода
 
@@ -359,17 +446,23 @@ black . --check
 
 ## Текущее состояние и план развития
 
-Реализовано (ПР5):
+Реализовано (ПР5–ПР6):
 
 * Django-проект и три приложения (`homepage`, `exercises`, `workouts`);
 * маршрутизация двух уровней и обработка ошибки 404;
 * view-функции и страницы со списками и страницами объектов;
 * отображение данных предметной области из JSON через классы ПР3;
+* Django Template Language: базовый шаблон `base.html`, наследование, блоки,
+  включаемые шаблоны, контекст, циклы и условия, фильтры;
+* именованные URL и пространства имён, ссылки через `{% url %}`;
+* статические файлы: собственные CSS и JavaScript, логотип;
 * навигация между страницами и оформление Bootstrap 5.3.
+
+Пока не реализовано: формы, Django ORM и база данных для данных проекта
+(данные по-прежнему хранятся в JSON).
 
 Планируется:
 
-* переход на шаблоны (`templates/`) и отказ от функции `page()`;
 * перенос сущностей в Django ORM, подключение базы данных;
 * формы создания и отмены тренировок;
 * использование отложенной логики ПР3 в веб-интерфейсе;
@@ -428,11 +521,10 @@ black . --check
 | `load_workouts()`, `save_workouts()` | `storage.py` | JSON ↔ объекты `Workout`; используется вебом |
 | `load_results()`, `save_results()` | `storage.py` | JSON ↔ объекты `Result` |
 
-Веб-слой (ПР5):
+Веб-слой (ПР5–ПР6, HTML формируется шаблонами через `render()`):
 
 | Имя | Файл | Назначение |
 |---|---|---|
-| `page()` | `homepage/views.py` | общий HTML-каркас страницы |
 | `index()` | `homepage/views.py` | главная страница `/` |
 | `page_not_found()` | `homepage/views.py` | обработчик 404 |
 | `exercises()` | `exercises/views.py` | страница `/exercises/` |

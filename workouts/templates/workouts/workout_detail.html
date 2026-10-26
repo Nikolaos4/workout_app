@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if workout %}
+        Тренировка №{{ workout.id }} – Сервис учета тренировок
+    {% else %}
+        Тренировка не найдена – Сервис учета тренировок
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% if workout %}
+        <div class="card">
+            <div class="card-body">
+                <h1 class="card-title h5">Тренировка №{{ workout.id }}</h1>
+
+                <p class="card-text">
+                    <strong>Пользователь:</strong> {{ workout.user.name }}
+                </p>
+
+                <p class="card-text">
+                    <strong>Дата:</strong>
+                    {{ workout.workout_date|date:"d.m.Y" }}
+                </p>
+
+                <p class="card-text">
+                    <strong>Тип:</strong> {{ workout.workout_type }},
+                    длительность: {{ workout.duration_min }} мин
+                </p>
+
+                <p class="card-text">
+                    <strong>Статус:</strong>
+                    {% include "workouts/includes/workout_status.html" %}
+                </p>
+
+                <p class="card-text">Выполненные упражнения:</p>
+                <ul class="list-group mb-3">
+                    {% for item in workout.exercises %}
+                        <li class="list-group-item">{{ item }}</li>
+                    {% empty %}
+                        <li class="list-group-item">Упражнений нет.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    {% else %}
+        <h1 class="text-danger">Тренировка не найдена</h1>
+        <p>Тренировка с указанным идентификатором отсутствует.</p>
+    {% endif %}
+
+    <a
+        href="{% url 'workouts:list' %}"
+        class="btn btn-outline-secondary mt-3"
+    >
+        ← к списку тренировок
+    </a>
+{% endblock %}

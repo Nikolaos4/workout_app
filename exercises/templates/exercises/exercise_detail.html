@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if exercise %}
+        {{ exercise.name }}  – Сервис учета тренировок
+    {% else %}
+        Упражнение не найдено – Сервис учета тренировок
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% if exercise %}
+        <div class="card">
+            <div class="card-body">
+                <h1 class="card-title h5">{{ exercise.name}}</h1>
+
+                <p class="card-text">
+                    <strong>ID:</strong> {{ exercise.id }}
+                </p>
+
+                <p class="card-text">
+                    <strong>Группа мышц:</strong>
+                    {{ exercise.muscle_group }}
+                </p>
+
+                <p class="card-text">
+                    Выполнялось в тренировках:
+                    {% if used_count %}
+                        <span class="badge bg-success">{{ used_count }}</span>
+                    {% else %}
+                        <span class="badge bg-secondary">{{ used_count }}</span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    {% else %}
+        <h1 class="text-danger">Упражнение не найдено</h1>
+        <p>Упражнение с указанным идентификатором отсутствует.</p>
+    {% endif %}
+
+    <a
+        href="{% url 'exercises:list' %}"
+        class="btn btn-outline-secondary mt-3"
+    >
+        ← к списку упражнений
+    </a>
+{% endblock %}

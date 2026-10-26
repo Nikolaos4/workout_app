@@ -1,0 +1,27 @@
+body {
+    min-height: 100vh;
+}
+
+.app-logo {
+    width: 72px;
+    height: auto;
+    margin: 1rem 0 0.5rem;
+}
+
+.exercise-card {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.workout-status {
+    font-weight: 600;
+}
+
+.workout-status-active {
+    letter-spacing: 0.02em;
+}
+
+.workout-status-cancelled {
+    text-decoration: line-through;
+}

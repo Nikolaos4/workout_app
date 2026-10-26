@@ -1,0 +1,18 @@
+<article class="card exercise-card mb-3">
+    <div class="card-body">
+        <h2 class="card-title h5">
+            {{ exercise.name|default:"Без названия"}}
+        </h2>
+
+        <p class="card-text">
+            Группа мышц: {{ exercise.muscle_group}}
+        </p>
+
+        <a
+            href="{% url 'exercises:detail' exercise.id %}"
+            class="btn btn-primary"
+        >
+            Подробнее
+        </a>
+    </div>
+</article>  

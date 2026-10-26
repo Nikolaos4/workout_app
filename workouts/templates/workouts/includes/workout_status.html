@@ -1,0 +1,9 @@
+{% if workout.is_cancelled %}
+    <span class="badge bg-secondary workout-status workout-status-cancelled">
+        отменена
+    </span>
+{% else %}
+    <span class="badge bg-success workout-status workout-status-active">
+        активна
+    </span>
+{% endif %}

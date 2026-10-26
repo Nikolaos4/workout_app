@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Главная – Сервис учета тренировок
+{% endblock %}
+
+{% block content %}
+    <h1 class="display-4">Сервис учета тренировок</h1>
+
+    <p class="lead">
+        Записывайте тренировки и следите за прогрессом.
+    </p>    
+    <p>Основные разделы:</p>
+    <a href="{% url 'exercises:list' %}" class="btn btn-primary me-2">
+        Упражнения
+    </a>
+    <a href="{% url 'workouts:list' %}" class="btn btn-secondary">
+        Тренировки
+    </a>
+{% endblock %}
