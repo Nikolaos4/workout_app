@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Статистика – Сервис учета тренировок
+{% endblock %}
+
+{% block content %}
+    <h1>Статистика тренировок</h1>
+    <p class="text-muted">Учитываются только активные (не отменённые) тренировки.</p>
+
+    <section class="statistics-item">
+        <h2 class="h5">Сводка</h2>
+        {% if summary.workouts_count %}
+            <ul>
+                <li>Тренировок: {{ summary.workouts_count }}</li>
+                <li>
+                    Средняя длительность:
+                    {{ summary.avg_duration|floatformat:"-1" }} мин
+                </li>
+                <li>Первая тренировка: {{ summary.first_date }}</li>
+                <li>Последняя тренировка: {{ summary.last_date }}</li>
+            </ul>
+        {% else %}
+            <p>Данные отсутствуют.</p>
+        {% endif %}
+    </section>
+
+    <section class="statistics-item">
+        <h2 class="h5">Популярность упражнений</h2>
+        <ul class="list-group">
+            {% for item in exercise_popularity %}
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>{{ item.exercise_name }} ({{ item.muscle_group }})</span>
+                    <span class="badge bg-primary">{{ item.workouts_count }}</span>
+                </li>
+            {% empty %}
+                <li class="list-group-item">Данные отсутствуют.</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section class="statistics-item">
+        <h2 class="h5">Тоннаж по группам мышц</h2>
+        <ul class="list-group">
+            {% for item in muscle_group_tonnage %}
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>{{ item.muscle_group }}</span>
+                    <span>{{ item.tonnage|floatformat:"-1" }} кг</span>
+                </li>
+            {% empty %}
+                <li class="list-group-item">Данные отсутствуют.</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section class="statistics-item">
+        <h2 class="h5">Активные пользователи</h2>
+        <form method="get" class="row g-2 align-items-end mb-3">
+            <div class="col-auto">
+                <label for="min_workouts" class="form-label">
+                    Не меньше тренировок
+                </label>
+                <input
+                    type="number"
+                    min="0"
+                    id="min_workouts"
+                    name="min_workouts"
+                    value="{{ min_workouts }}"
+                    class="form-control"
+                >
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary">Показать</button>
+            </div>
+        </form>
+        <ul class="list-group">
+            {% for item in active_users %}
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>{{ item.user_name }}</span>
+                    <span>
+                        тренировок: {{ item.workouts_count }},
+                        минут: {{ item.total_minutes }}
+                    </span>
+                </li>
+            {% empty %}
+                <li class="list-group-item">
+                    Нет пользователей с таким числом тренировок.
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+{% endblock %}

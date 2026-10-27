@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Поиск упражнений – Сервис учета тренировок
+{% endblock %}
+
+{% block content %}
+    <h1>Поиск упражнений</h1>
+
+    <form method="get" class="row g-2 align-items-end mb-3">
+        <div class="col-auto">
+            <label for="muscle_group" class="form-label">Группа мышц</label>
+            <select id="muscle_group" name="muscle_group" class="form-select">
+                <option value="">— выберите —</option>
+                {% for group in muscle_groups %}
+                    <option
+                        value="{{ group.muscle_group }}"
+                        {% if group.muscle_group == muscle_group %}selected{% endif %}
+                    >
+                        {{ group.muscle_group }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <label for="name" class="form-label">Часть названия</label>
+            <input
+                type="text"
+                id="name"
+                name="name"
+                value="{{ name }}"
+                class="form-control"
+            >
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Найти</button>
+        </div>
+    </form>
+
+    {% if muscle_group %}
+        <h2 class="h5">Группа мышц: {{ muscle_group }}</h2>
+        {% for exercise in exercises %}
+            {% include "exercises/includes/exercise_card.html" %}
+        {% empty %}
+            <p>Подходящих упражнений не найдено.</p>
+        {% endfor %}
+    {% endif %}
+
+    <a href="{% url 'exercises:list' %}" class="btn btn-outline-secondary mt-3">
+        ← ко всем упражнениям
+    </a>
+{% endblock %}

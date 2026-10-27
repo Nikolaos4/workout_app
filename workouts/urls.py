@@ -8,5 +8,6 @@ app_name = "workouts"
 
 urlpatterns = [
     path("", views.workouts, name="list"),
+    path("statistics/", views.statistics, name="statistics"),
     path("<int:workout_id>/", views.workout_detail, name="detail"),
 ]

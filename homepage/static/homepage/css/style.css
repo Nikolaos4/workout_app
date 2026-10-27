@@ -25,3 +25,7 @@ body {
 .workout-status-cancelled {
     text-decoration: line-through;
 }
+
+.statistics-item {
+    margin-bottom: 1.5rem;
+}

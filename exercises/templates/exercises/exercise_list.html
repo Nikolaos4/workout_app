@@ -10,6 +10,10 @@
     <p>
         Всего упражнений: {{ exercises|length }}
     </p>
+
+    <a href="{% url 'exercises:search' %}" class="btn btn-outline-primary mb-3">
+        Найти упражнение по группе мышц
+    </a>
     
     {% for exercise in exercises %}
         {% include "exercises/includes/exercise_card.html" %}

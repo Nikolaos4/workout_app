@@ -15,7 +15,7 @@
                 <h1 class="card-title h5">Тренировка №{{ workout.id }}</h1>
 
                 <p class="card-text">
-                    <strong>Пользователь:</strong> {{ workout.user.name }}
+                    <strong>Пользователь:</strong> {{ workout.user_name }}
                 </p>
 
                 <p class="card-text">
@@ -35,8 +35,15 @@
 
                 <p class="card-text">Выполненные упражнения:</p>
                 <ul class="list-group mb-3">
-                    {% for item in workout.exercises %}
-                        <li class="list-group-item">{{ item }}</li>
+                    {% for item in items %}
+                        <li class="list-group-item">
+                            {{ item.exercise_name }} ({{ item.muscle_group }}):
+                            {{ item.sets }} подх. по {{ item.reps }} раз,
+                            {{ item.weight|floatformat:"-1" }} кг
+                            <span class="text-muted">
+                                – тоннаж {{ item.tonnage|floatformat:"-1" }} кг
+                            </span>
+                        </li>
                     {% empty %}
                         <li class="list-group-item">Упражнений нет.</li>
                     {% endfor %}

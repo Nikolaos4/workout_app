@@ -7,22 +7,74 @@
 {% block content %}
     <h1>Тренировки</h1>
 
-    <p>
-        Всего тренировок: {{ workouts|length }}
-    </p>
+    <form method="get" class="row g-2 align-items-end mb-3">
+        <div class="col-auto">
+            <label for="start" class="form-label">С даты</label>
+            <input
+                type="date"
+                id="start"
+                name="start"
+                value="{{ start }}"
+                class="form-control"
+            >
+        </div>
+        <div class="col-auto">
+            <label for="end" class="form-label">По дату</label>
+            <input
+                type="date"
+                id="end"
+                name="end"
+                value="{{ end }}"
+                class="form-control"
+            >
+        </div>
+        <div class="col-auto form-check mb-2 ms-2">
+            <input
+                type="checkbox"
+                id="active"
+                name="active"
+                value="1"
+                class="form-check-input"
+                {% if only_active %}checked{% endif %}
+            >
+            <label for="active" class="form-check-label">Только активные</label>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Показать</button>
+            <a href="{% url 'workouts:list' %}" class="btn btn-outline-secondary">
+                Сбросить
+            </a>
+        </div>
+    </form>
+
+    {% if invalid_dates %}
+        <p class="text-danger">Некорректная дата: используйте формат ГГГГ-ММ-ДД.</p>
+    {% else %}
+        <p>
+            Всего тренировок: {{ workouts|length }}
+        </p>
+    {% endif %}
 
     <ul class="list-group">
         {% for workout in workouts %}
             <li class="list-group-item d-flex justify-content-between">
-                <a href="{% url 'workouts:detail' workout.id %}">
-                    {{ workout.workout_date|date:"d.m.Y" }} –
-                    {{ workout.workout_type }},
-                    {{ workout.user.name }}
-                </a>
+                <span>
+                    <a href="{% url 'workouts:detail' workout.id %}">
+                        {{ workout.workout_date|date:"d.m.Y" }} –
+                        {{ workout.workout_type }},
+                        {{ workout.user_name }}
+                    </a>
+                    <small class="text-muted">
+                        упражнений: {{ workout.exercises_count }},
+                        тоннаж: {{ workout.tonnage|floatformat:"-1" }} кг
+                    </small>
+                </span>
                 {% include "workouts/includes/workout_status.html" %}
             </li>
         {% empty %}
-            <li class="list-group-item">Тренировок пока нет.</li>
+            {% if not invalid_dates %}
+                <li class="list-group-item">Тренировок не найдено.</li>
+            {% endif %}
         {% endfor %}
     </ul>
 {% endblock %}
