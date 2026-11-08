@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     "homepage",
     "exercises",
     "workouts",
+    "users",
+    "results",
 ]
 
 MIDDLEWARE = [
