@@ -17,8 +17,8 @@
                     Средняя длительность:
                     {{ summary.avg_duration|floatformat:"-1" }} мин
                 </li>
-                <li>Первая тренировка: {{ summary.first_date }}</li>
-                <li>Последняя тренировка: {{ summary.last_date }}</li>
+                <li>Первая тренировка: {{ summary.first_date|date:"d.m.Y" }}</li>
+                <li>Последняя тренировка: {{ summary.last_date|date:"d.m.Y" }}</li>
             </ul>
         {% else %}
             <p>Данные отсутствуют.</p>
@@ -30,7 +30,7 @@
         <ul class="list-group">
             {% for item in exercise_popularity %}
                 <li class="list-group-item d-flex justify-content-between">
-                    <span>{{ item.exercise_name }} ({{ item.muscle_group }})</span>
+                    <span>{{ item.name }} ({{ item.muscle_group }})</span>
                     <span class="badge bg-primary">{{ item.workouts_count }}</span>
                 </li>
             {% empty %}
@@ -76,7 +76,7 @@
         <ul class="list-group">
             {% for item in active_users %}
                 <li class="list-group-item d-flex justify-content-between">
-                    <span>{{ item.user_name }}</span>
+                    <span>{{ item.name }}</span>
                     <span>
                         тренировок: {{ item.workouts_count }},
                         минут: {{ item.total_minutes }}

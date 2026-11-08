@@ -14,10 +14,10 @@
                 <option value="">— выберите —</option>
                 {% for group in muscle_groups %}
                     <option
-                        value="{{ group.muscle_group }}"
-                        {% if group.muscle_group == muscle_group %}selected{% endif %}
+                        value="{{ group }}"
+                        {% if group == muscle_group %}selected{% endif %}
                     >
-                        {{ group.muscle_group }}
+                        {{ group }}
                     </option>
                 {% endfor %}
             </select>

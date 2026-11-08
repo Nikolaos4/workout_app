@@ -1,25 +1,13 @@
-"""View-функции приложения exercises: данные берутся из SQLite (ПР7)."""
-
-import sqlite3
-from contextlib import closing
+"""View-функции приложения exercises: данные берутся через Django ORM (ПР9)."""
 
 from django.shortcuts import render
 
-from db.database import get_connection
+from .models import Exercise
 
 
 def exercises(request):
-    """Страница /exercises/: список упражнений из таблицы exercises."""
-    with closing(get_connection()) as conn:
-        conn.row_factory = sqlite3.Row
-        exercises_list = conn.execute("""
-            SELECT
-                id,
-                name,
-                muscle_group
-            FROM exercises
-            ORDER BY name;
-        """).fetchall()
+    """Страница /exercises/: список упражнений, отсортированный по названию."""
+    exercises_list = Exercise.objects.order_by("name")
 
     context = {
         "exercises": exercises_list,
@@ -39,37 +27,28 @@ def exercise_detail(request, exercise_id):
     а ответ возвращается с кодом 404.
     """
     used_count = 0
-    with closing(get_connection()) as conn:
-        conn.row_factory = sqlite3.Row
-        exercise = conn.execute(
-            """
-            SELECT
-                id,
-                name,
-                muscle_group
-            FROM exercises
-            WHERE id = ?;
-            """,
-            [exercise_id],
-        ).fetchone()
+    same_group = Exercise.objects.none()
 
-        if exercise is not None:
-            used_count = conn.execute(
-                """
-                SELECT
-                    COUNT(DISTINCT workouts.id) AS used_count
-                FROM workout_exercises
-                JOIN workouts
-                    ON workouts.id = workout_exercises.workout_id
-                WHERE workout_exercises.exercise_id = ?
-                  AND workouts.is_cancelled = 0;
-                """,
-                [exercise_id],
-            ).fetchone()["used_count"]
+    try:
+        exercise = Exercise.objects.get(pk=exercise_id)
+    except Exercise.DoesNotExist:
+        exercise = None
+    else:
+        # Обратная связь M2M (related_name="workouts"): в скольких активных
+        # тренировках выполнялось упражнение. distinct() не даёт посчитать
+        # тренировку дважды, если упражнение повторяется в ней несколько раз.
+        used_count = exercise.workouts.filter(is_cancelled=False).distinct().count()
+        # Другие упражнения той же группы мышц: исключаем текущее.
+        same_group = (
+            Exercise.objects.filter(muscle_group=exercise.muscle_group)
+            .exclude(pk=exercise.pk)
+            .order_by("name")
+        )
 
     context = {
         "exercise": exercise,
         "used_count": used_count,
+        "same_group": same_group,
     }
 
     return render(
@@ -83,36 +62,27 @@ def exercise_detail(request, exercise_id):
 def exercise_search(request):
     """Страница /exercises/search/: поиск по группе мышц и названию.
 
-    Значения приходят из GET-параметров и передаются в запрос только через
-    заполнители ?, поэтому не могут изменить текст SQL.
+    Значения из GET-параметров передаются в ORM-фильтры, которые сами
+    подставляют их параметрами запроса, поэтому изменить текст SQL нельзя.
+    Ограничение SQLite: оператор LIKE (а с ним и icontains) не различает
+    регистр только у латинских букв, у кириллицы регистр учитывается.
     """
     muscle_group = request.GET.get("muscle_group", "")
     name = request.GET.get("name", "").strip()
-    found = []
+    found = Exercise.objects.none()
 
-    with closing(get_connection()) as conn:
-        conn.row_factory = sqlite3.Row
-        muscle_groups = conn.execute("""
-            SELECT DISTINCT
-                muscle_group
-            FROM exercises
-            ORDER BY muscle_group;
-        """).fetchall()
+    # Список групп мышц без повторов для выпадающего списка.
+    muscle_groups = (
+        Exercise.objects.order_by("muscle_group")
+        .values_list("muscle_group", flat=True)
+        .distinct()
+    )
 
-        if muscle_group:
-            found = conn.execute(
-                """
-                SELECT
-                    id,
-                    name,
-                    muscle_group
-                FROM exercises
-                WHERE muscle_group = ?
-                  AND name LIKE '%' || ? || '%'
-                ORDER BY name;
-                """,
-                [muscle_group, name],
-            ).fetchall()
+    if muscle_group:
+        found = Exercise.objects.filter(
+            muscle_group=muscle_group,
+            name__icontains=name,
+        ).order_by("name")
 
     context = {
         "muscle_groups": muscle_groups,

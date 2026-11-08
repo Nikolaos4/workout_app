@@ -1,89 +1,129 @@
-"""View-функции приложения workouts: данные берутся из SQLite (ПР7)."""
+"""View-функции приложения workouts: данные берутся через Django ORM (ПР9)."""
 
-import sqlite3
-from contextlib import closing
 from datetime import date
 
+from django.core.paginator import Paginator
+from django.db.models import Avg, Count, F, FloatField, Max, Min, Q, Sum
+from django.db.models.functions import Coalesce
 from django.shortcuts import render
 
-from db.database import get_connection
+from exercises.models import Exercise
+from users.models import User
 
-# Границы периода по умолчанию: подходят любые даты формата YYYY-MM-DD.
-MIN_DATE = "0000-01-01"
-MAX_DATE = "9999-12-31"
+from .models import Workout, WorkoutExercise
+
+# Сколько тренировок показывать на одной странице списка.
+PAGE_SIZE = 5
+
+# Допустимые значения параметра sort. В order_by() попадают только поля из
+# этого словаря, а не произвольная строка из запроса пользователя.
+SORT_FIELDS = {
+    "date": ("-workout_date", "-pk"),
+    "date_asc": ("workout_date", "pk"),
+    "user": ("user__name", "-workout_date", "-pk"),
+    "duration": ("-duration_min", "-pk"),
+    "tonnage": ("-tonnage", "-pk"),
+}
+SORT_LABELS = {
+    "date": "дате (сначала новые)",
+    "date_asc": "дате (сначала старые)",
+    "user": "пользователю",
+    "duration": "длительности",
+    "tonnage": "тоннажу",
+}
+DEFAULT_SORT = "date"
 
 
 def _parse_date(value):
-    """Вернуть дату в виде строки YYYY-MM-DD или None, если формат неверный."""
+    """Вернуть дату или None, если строка не в формате ГГГГ-ММ-ДД."""
     try:
-        return date.fromisoformat(value).isoformat()
+        return date.fromisoformat(value)
     except ValueError:
         return None
 
 
-def _with_date(row):
-    """Превратить строку результата в словарь с датой типа date.
+def _parse_id(value):
+    """Вернуть целый идентификатор из строки или None, если это не число."""
+    if value.isascii() and value.isdigit() and len(value) <= 9:
+        return int(value)
+    return None
 
-    В SQLite дата хранится строкой, а фильтр шаблона date:"d.m.Y" работает
-    только с объектами date.
-    """
-    workout = dict(row)
-    workout["workout_date"] = date.fromisoformat(workout["workout_date"])
-    return workout
+
+def _tonnage(prefix=""):
+    """Сумма «подходы × повторения × вес»; prefix — путь до строк упражнений."""
+    return Sum(
+        F(f"{prefix}sets") * F(f"{prefix}reps") * F(f"{prefix}weight"),
+        output_field=FloatField(),
+    )
 
 
 def workouts(request):
-    """Страница /workouts/: список тренировок из SQLite с фильтрами.
+    """Страница /workouts/: список тренировок с фильтрами, сортировкой и страницами.
 
-    GET-параметры: active=1 (только активные), start и end (период дат).
-    Значения передаются в запрос именованными параметрами, а не в строку SQL.
+    GET-параметры: active=1 (только активные), start и end (период дат),
+    q (поиск по имени пользователя и типу), type, user, sort, page.
     """
     only_active = request.GET.get("active") == "1"
     start_raw = request.GET.get("start", "")
     end_raw = request.GET.get("end", "")
-    start = _parse_date(start_raw) if start_raw else MIN_DATE
-    end = _parse_date(end_raw) if end_raw else MAX_DATE
-    invalid_dates = start is None or end is None
+    query = request.GET.get("q", "").strip()
+    type_raw = request.GET.get("type", "")
+    user_raw = request.GET.get("user", "")
+    sort = request.GET.get("sort", DEFAULT_SORT)
+    if sort not in SORT_FIELDS:
+        sort = DEFAULT_SORT
 
-    workouts_list = []
-    if not invalid_dates:
-        with closing(get_connection()) as conn:
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                """
-                SELECT
-                    workouts.id,
-                    workouts.workout_date,
-                    workouts.workout_type,
-                    workouts.duration_min,
-                    workouts.is_cancelled,
-                    users.name AS user_name,
-                    COUNT(workout_exercises.id) AS exercises_count,
-                    COALESCE(
-                        SUM(workout_exercises.sets
-                            * workout_exercises.reps
-                            * workout_exercises.weight),
-                        0
-                    ) AS tonnage
-                FROM workouts
-                JOIN users
-                    ON workouts.user_id = users.id
-                LEFT JOIN workout_exercises
-                    ON workout_exercises.workout_id = workouts.id
-                WHERE (:only_active = 0 OR workouts.is_cancelled = 0)
-                  AND workouts.workout_date BETWEEN :start AND :end
-                GROUP BY workouts.id, users.name
-                ORDER BY workouts.workout_date DESC, workouts.id DESC;
-                """,
-                {"only_active": int(only_active), "start": start, "end": end},
-            ).fetchall()
-        workouts_list = [_with_date(row) for row in rows]
+    start = _parse_date(start_raw) if start_raw else None
+    end = _parse_date(end_raw) if end_raw else None
+    invalid_dates = (start_raw and start is None) or (end_raw and end is None)
+
+    # select_related загружает пользователя тем же запросом (JOIN), а
+    # annotate считает для каждой тренировки число упражнений и тоннаж.
+    # Тренировки без упражнений остаются в списке (с нулями).
+    queryset = Workout.objects.select_related("user").annotate(
+        exercises_count=Count("workout_exercises"),
+        tonnage=Coalesce(
+            _tonnage("workout_exercises__"), 0.0, output_field=FloatField()
+        ),
+    )
+
+    if only_active:
+        queryset = queryset.filter(is_cancelled=False)
+    if start:
+        queryset = queryset.filter(workout_date__gte=start)
+    if end:
+        queryset = queryset.filter(workout_date__lte=end)
+    if query:
+        # Поиск по нескольким полям, в том числе по полю связанной модели.
+        queryset = queryset.filter(
+            Q(user__name__icontains=query) | Q(workout_type__icontains=query)
+        )
+    if type_raw in Workout.WorkoutType.values:
+        queryset = queryset.filter(workout_type=type_raw)
+    user_id = _parse_id(user_raw)
+    if user_id is not None:
+        queryset = queryset.filter(user_id=user_id)
+    if invalid_dates:
+        queryset = Workout.objects.none()
+
+    paginator = Paginator(queryset.order_by(*SORT_FIELDS[sort]), PAGE_SIZE)
+    # get_page не падает: неверный номер страницы заменяется ближайшим верным.
+    page_obj = paginator.get_page(request.GET.get("page"))
 
     context = {
-        "workouts": workouts_list,
+        "workouts": page_obj,
+        "page_obj": page_obj,
+        "total": paginator.count,
         "only_active": only_active,
         "start": start_raw,
         "end": end_raw,
+        "q": query,
+        "selected_type": type_raw,
+        "selected_user": user_raw,
+        "sort": sort,
+        "sort_options": SORT_LABELS.items(),
+        "workout_types": Workout.WorkoutType.choices,
+        "users": User.objects.order_by("name"),
         "invalid_dates": invalid_dates,
     }
 
@@ -101,47 +141,13 @@ def workout_detail(request, workout_id):
     а ответ возвращается с кодом 404.
     """
     items = []
-    with closing(get_connection()) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            """
-            SELECT
-                workouts.id,
-                workouts.workout_date,
-                workouts.workout_type,
-                workouts.duration_min,
-                workouts.is_cancelled,
-                users.name AS user_name
-            FROM workouts
-            JOIN users
-                ON workouts.user_id = users.id
-            WHERE workouts.id = ?;
-            """,
-            [workout_id],
-        ).fetchone()
-
-        if row is not None:
-            items = conn.execute(
-                """
-                SELECT
-                    exercises.name AS exercise_name,
-                    exercises.muscle_group,
-                    workout_exercises.sets,
-                    workout_exercises.reps,
-                    workout_exercises.weight,
-                    workout_exercises.sets
-                        * workout_exercises.reps
-                        * workout_exercises.weight AS tonnage
-                FROM workout_exercises
-                JOIN exercises
-                    ON workout_exercises.exercise_id = exercises.id
-                WHERE workout_exercises.workout_id = ?
-                ORDER BY workout_exercises.id;
-                """,
-                [workout_id],
-            ).fetchall()
-
-    workout = _with_date(row) if row is not None else None
+    try:
+        workout = Workout.objects.select_related("user").get(pk=workout_id)
+    except Workout.DoesNotExist:
+        workout = None
+    else:
+        # Строки упражнений вместе с упражнениями одним запросом (JOIN).
+        items = workout.workout_exercises.select_related("exercise").order_by("pk")
 
     context = {
         "workout": workout,
@@ -159,72 +165,52 @@ def workout_detail(request, workout_id):
 def statistics(request):
     """Страница /workouts/statistics/: статистика по активным тренировкам.
 
-    GET-параметр min_workouts задаёт порог для отбора пользователей (HAVING).
+    GET-параметр min_workouts задаёт порог для отбора пользователей.
     """
     try:
-        min_workouts = max(int(request.GET.get("min_workouts", 1)), 0)
+        min_workouts = min(max(int(request.GET.get("min_workouts", 1)), 0), 1_000_000)
     except ValueError:
         min_workouts = 1
 
-    with closing(get_connection()) as conn:
-        conn.row_factory = sqlite3.Row
-        summary = conn.execute("""
-            SELECT
-                COUNT(*) AS workouts_count,
-                AVG(duration_min) AS avg_duration,
-                MIN(workout_date) AS first_date,
-                MAX(workout_date) AS last_date
-            FROM workouts
-            WHERE is_cancelled = 0;
-        """).fetchone()
+    active_workouts = Workout.objects.filter(is_cancelled=False)
 
-        exercise_popularity = conn.execute("""
-            SELECT
-                exercises.name AS exercise_name,
-                exercises.muscle_group,
-                COUNT(DISTINCT workouts.id) AS workouts_count
-            FROM exercises
-            LEFT JOIN workout_exercises
-                ON workout_exercises.exercise_id = exercises.id
-            LEFT JOIN workouts
-                ON workouts.id = workout_exercises.workout_id
-               AND workouts.is_cancelled = 0
-            GROUP BY exercises.id, exercises.name, exercises.muscle_group
-            ORDER BY workouts_count DESC, exercises.name;
-        """).fetchall()
+    # aggregate: один сводный показатель на весь набор.
+    summary = active_workouts.aggregate(
+        workouts_count=Count("id"),
+        avg_duration=Avg("duration_min"),
+        first_date=Min("workout_date"),
+        last_date=Max("workout_date"),
+    )
 
-        muscle_group_tonnage = conn.execute("""
-            SELECT
-                exercises.muscle_group,
-                SUM(workout_exercises.sets
-                    * workout_exercises.reps
-                    * workout_exercises.weight) AS tonnage
-            FROM workout_exercises
-            JOIN exercises
-                ON exercises.id = workout_exercises.exercise_id
-            JOIN workouts
-                ON workouts.id = workout_exercises.workout_id
-            WHERE workouts.is_cancelled = 0
-            GROUP BY exercises.muscle_group
-            ORDER BY tonnage DESC;
-        """).fetchall()
+    # annotate: показатель для каждого упражнения. Упражнения без активных
+    # тренировок остаются в списке с нулём; отменённые не учитываются.
+    exercise_popularity = Exercise.objects.annotate(
+        workouts_count=Count(
+            "workout_exercises__workout",
+            filter=Q(workout_exercises__workout__is_cancelled=False),
+            distinct=True,
+        )
+    ).order_by("-workouts_count", "name")
 
-        active_users = conn.execute(
-            """
-            SELECT
-                users.name AS user_name,
-                COUNT(workouts.id) AS workouts_count,
-                SUM(workouts.duration_min) AS total_minutes
-            FROM users
-            JOIN workouts
-                ON workouts.user_id = users.id
-            WHERE workouts.is_cancelled = 0
-            GROUP BY users.id, users.name
-            HAVING COUNT(workouts.id) >= ?
-            ORDER BY workouts_count DESC, users.name;
-            """,
-            [min_workouts],
-        ).fetchall()
+    # values + annotate: группировка по группе мышц.
+    muscle_group_tonnage = (
+        WorkoutExercise.objects.filter(workout__is_cancelled=False)
+        .values(muscle_group=F("exercise__muscle_group"))
+        .annotate(tonnage=_tonnage())
+        .order_by("-tonnage")
+    )
+
+    # Условие по активным тренировкам стоит до annotate, поэтому считаются
+    # только они; фильтр по workouts_count после annotate работает как HAVING.
+    active_users = (
+        User.objects.filter(workouts__is_cancelled=False)
+        .annotate(
+            workouts_count=Count("workouts"),
+            total_minutes=Sum("workouts__duration_min"),
+        )
+        .filter(workouts_count__gte=min_workouts)
+        .order_by("-workouts_count", "name")
+    )
 
     context = {
         "summary": summary,

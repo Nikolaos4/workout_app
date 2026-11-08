@@ -31,6 +31,21 @@
                         <span class="badge bg-secondary">{{ used_count }}</span>
                     {% endif %}
                 </p>
+
+                {% if same_group %}
+                    <p class="card-text mb-1">
+                        Другие упражнения этой группы мышц:
+                    </p>
+                    <ul class="mb-0">
+                        {% for other in same_group %}
+                            <li>
+                                <a href="{% url 'exercises:detail' other.id %}">
+                                    {{ other.name }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
             </div>
         </div>
     {% else %}
