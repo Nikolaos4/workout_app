@@ -1,10 +1,12 @@
-"""Тесты слоя SQLite (ПР7): схема, импорт из JSON, SQL-запросы в представлениях."""
+"""Тесты слоя SQLite (ПР7): схема и импорт из JSON.
+
+Страницы сайта с ПР9 работают через Django ORM, их проверяют
+test_web.py и test_orm_queries.py."""
 
 import json
 import sqlite3
 
 import pytest
-from django.test import Client
 
 import db.database as database
 from db.database import get_connection, init_db
@@ -56,10 +58,6 @@ def demo_db(imported_db):
     conn.executescript(DEMO_DATA.read_text(encoding="utf-8"))
     conn.close()
     return imported_db
-
-
-def get(url):
-    return Client(HTTP_HOST="localhost").get(url)
 
 
 # --- структура базы -----------------------------------------------------
@@ -139,114 +137,9 @@ def test_import_converts_cancelled_flag_to_integer(imported_db):
     assert value == 0
 
 
-# --- страницы, получающие данные из SQLite ------------------------------
-
-
-def test_lists_and_details_use_sqlite(imported_db):
+def test_demo_data_is_added_on_top_of_json(demo_db):
     conn = get_connection()
-    conn.execute("UPDATE exercises SET name = 'Тестовое упражнение' WHERE id = 1")
-    conn.commit()
+    assert count(conn, "users") == 2
+    assert count(conn, "workouts") == 5
+    assert count(conn, "workout_exercises") == 9
     conn.close()
-    assert "Тестовое упражнение" in get("/exercises/").content.decode()
-    assert "Тестовое упражнение" in get("/workouts/1/").content.decode()
-
-
-def test_exercise_detail_counts_workouts_with_sql(imported_db):
-    html = get("/exercises/1/").content.decode()
-    assert "Выполнялось в тренировках" in html
-    assert 'bg-success">1<' in html
-
-
-def test_missing_objects_return_404(imported_db):
-    assert get("/exercises/999/").status_code == 404
-    assert get("/workouts/999/").status_code == 404
-
-
-def test_workout_detail_shows_joined_data(imported_db):
-    html = get("/workouts/1/").content.decode()
-    assert "Николай Аниканов" in html
-    assert "07.09.2026" in html
-    assert "тоннаж 1920 кг" in html
-
-
-def test_workouts_list_filter_active_only(demo_db):
-    all_html = get("/workouts/").content.decode()
-    active_html = get("/workouts/?active=1").content.decode()
-    assert "Всего тренировок: 5" in all_html
-    assert "Всего тренировок: 4" in active_html
-    assert 'href="/workouts/5/"' in all_html
-    assert 'href="/workouts/5/"' not in active_html
-
-
-def test_workouts_list_filter_by_period(demo_db):
-    html = get("/workouts/?start=2026-09-14&end=2026-09-15").content.decode()
-    assert "Всего тренировок: 2" in html
-    assert 'href="/workouts/2/"' in html
-    assert 'href="/workouts/4/"' in html
-
-
-def test_workouts_list_invalid_date_shows_message(imported_db):
-    html = get("/workouts/?start=вчера").content.decode()
-    assert "Некорректная дата" in html
-
-
-def test_workouts_list_empty_result(imported_db):
-    html = get("/workouts/?start=2030-01-01").content.decode()
-    assert "Тренировок не найдено." in html
-
-
-def test_exercise_search_by_muscle_group(imported_db):
-    html = get("/exercises/search/?muscle_group=Ноги").content.decode()
-    assert "Присед" in html
-    assert "Молотки" not in html
-
-
-def test_exercise_search_with_name_fragment(imported_db):
-    html = get("/exercises/search/?muscle_group=Ноги&name=Нет").content.decode()
-    assert "Подходящих упражнений не найдено." in html
-
-
-def test_exercise_search_is_safe_from_sql_injection(imported_db):
-    payload = "' OR '1'='1"
-    response = get(f"/exercises/search/?muscle_group={payload}")
-    assert response.status_code == 200
-    assert "Подходящих упражнений не найдено." in response.content.decode()
-
-
-def test_statistics_page(demo_db):
-    html = get("/workouts/statistics/").content.decode()
-    assert "Тренировок: 4" in html
-    assert "Тоннаж по группам мышц" in html
-
-
-def test_statistics_counts_only_active_workouts(demo_db):
-    conn = get_connection()
-    row = conn.execute(
-        "SELECT COUNT(*) FROM workouts WHERE is_cancelled = 0"
-    ).fetchone()
-    conn.close()
-    assert row[0] == 4
-    assert "Тренировок: 4" in get("/workouts/statistics/").content.decode()
-
-
-def test_statistics_having_threshold(demo_db):
-    low = get("/workouts/statistics/?min_workouts=2").content.decode()
-    high = get("/workouts/statistics/?min_workouts=5").content.decode()
-    assert "Николай Аниканов" in low
-    assert "Мария Петрова" not in low
-    assert "Нет пользователей с таким числом тренировок." in high
-
-
-def test_statistics_bad_threshold_falls_back_to_default(imported_db):
-    response = get("/workouts/statistics/?min_workouts=abc")
-    assert response.status_code == 200
-
-
-def test_statistics_on_empty_database(db_path):
-    html = get("/workouts/statistics/").content.decode()
-    assert "Данные отсутствуют." in html
-
-
-def test_navigation_contains_statistics_link(imported_db):
-    html = get("/").content.decode()
-    assert 'href="/workouts/statistics/"' in html

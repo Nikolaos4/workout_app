@@ -1,7 +1,17 @@
 """Тесты веб-слоя Django: маршруты, страницы и коды ответов."""
 
+import pytest
 from django.test import Client, override_settings
 from django.urls import reverse
+
+# Страницы читают данные через ORM, поэтому каждому тесту нужна тестовая база
+# с данными, равными содержимому data/*.json (фикстура base_data).
+pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _data(base_data):
+    return base_data
 
 
 def get(url: str):
