@@ -91,7 +91,7 @@ def workouts(request):
         queryset = queryset.filter(is_cancelled=False)
     if start:
         queryset = queryset.filter(workout_date__gte=start)
-    if end:
+    if end: 
         queryset = queryset.filter(workout_date__lte=end)
     if query:
         # Поиск по нескольким полям, в том числе по полю связанной модели.

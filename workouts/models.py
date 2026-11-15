@@ -35,7 +35,7 @@ class Workout(models.Model):
         verbose_name="Тип тренировки",
     )
     duration_min = models.PositiveIntegerField(
-        default=0,
+        default=60,
         verbose_name="Длительность, мин",
     )
     # «Мягкая» отмена: запись остаётся в базе, но не входит в статистику.
