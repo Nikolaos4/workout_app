@@ -20,7 +20,7 @@ def exercises(request):
     )
 
 
-def exercise_detail(request, exercise_id):
+def exercise_detail(request, exercise_id=None, slug=None):
     """Страница /exercises/<id>/: информация об упражнении.
 
     Если упражнение не найдено, шаблон показывает сообщение об этом,
@@ -30,14 +30,16 @@ def exercise_detail(request, exercise_id):
     same_group = Exercise.objects.none()
 
     try:
-        exercise = Exercise.objects.get(pk=exercise_id)
+        exercise = Exercise.objects.get(
+            **({"slug": slug} if slug else {"pk": exercise_id})
+        )
     except Exercise.DoesNotExist:
         exercise = None
     else:
         # Обратная связь M2M (related_name="workouts"): в скольких активных
         # тренировках выполнялось упражнение. distinct() не даёт посчитать
         # тренировку дважды, если упражнение повторяется в ней несколько раз.
-        used_count = exercise.workouts.filter(is_cancelled=False).distinct().count()
+        used_count = exercise.workouts.counted().distinct().count()
         # Другие упражнения той же группы мышц: исключаем текущее.
         same_group = (
             Exercise.objects.filter(muscle_group=exercise.muscle_group)

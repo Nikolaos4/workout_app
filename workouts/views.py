@@ -1,7 +1,7 @@
 """View-функции приложения workouts: данные берутся через Django ORM (ПР9)."""
 
 from datetime import date
-
+from django.shortcuts import render, get_object_or_404
 from django.core.paginator import Paginator
 from django.db.models import Avg, Count, F, FloatField, Max, Min, Q, Sum
 from django.db.models.functions import Coalesce
@@ -88,10 +88,10 @@ def workouts(request):
     )
 
     if only_active:
-        queryset = queryset.filter(is_cancelled=False)
+        queryset = queryset.active()
     if start:
         queryset = queryset.filter(workout_date__gte=start)
-    if end: 
+    if end:
         queryset = queryset.filter(workout_date__lte=end)
     if query:
         # Поиск по нескольким полям, в том числе по полю связанной модели.
@@ -135,32 +135,23 @@ def workouts(request):
 
 
 def workout_detail(request, workout_id):
-    """Страница /workouts/<id>/: информация о тренировке.
+    workout = get_object_or_404(
+        Workout.objects.select_related("user"),
+        pk=workout_id,
+    )
 
-    Если тренировка не найдена, шаблон показывает сообщение об этом,
-    а ответ возвращается с кодом 404.
-    """
-    items = []
-    try:
-        workout = Workout.objects.select_related("user").get(pk=workout_id)
-    except Workout.DoesNotExist:
-        workout = None
-    else:
-        # Строки упражнений вместе с упражнениями одним запросом (JOIN).
-        items = workout.workout_exercises.select_related("exercise").order_by("pk")
-
-    context = {
-        "workout": workout,
-        "items": items,
-    }
+    items = workout.workout_exercises.select_related(
+        "exercise"
+    ).order_by("pk")
 
     return render(
         request,
         "workouts/workout_detail.html",
-        context,
-        status=404 if workout is None else 200,
+        {
+            "workout": workout,
+            "items": items,
+        },
     )
-
 
 def statistics(request):
     """Страница /workouts/statistics/: статистика по активным тренировкам.
@@ -172,7 +163,7 @@ def statistics(request):
     except ValueError:
         min_workouts = 1
 
-    active_workouts = Workout.objects.filter(is_cancelled=False)
+    active_workouts = Workout.objects.counted()
 
     # aggregate: один сводный показатель на весь набор.
     summary = active_workouts.aggregate(
@@ -187,14 +178,14 @@ def statistics(request):
     exercise_popularity = Exercise.objects.annotate(
         workouts_count=Count(
             "workout_exercises__workout",
-            filter=Q(workout_exercises__workout__is_cancelled=False),
+            filter=Q(workout_exercises__workout__status__in=("active", "completed")),
             distinct=True,
         )
     ).order_by("-workouts_count", "name")
 
     # values + annotate: группировка по группе мышц.
     muscle_group_tonnage = (
-        WorkoutExercise.objects.filter(workout__is_cancelled=False)
+        WorkoutExercise.objects.filter(workout__status__in=("active", "completed"))
         .values(muscle_group=F("exercise__muscle_group"))
         .annotate(tonnage=_tonnage())
         .order_by("-tonnage")
@@ -203,7 +194,7 @@ def statistics(request):
     # Условие по активным тренировкам стоит до annotate, поэтому считаются
     # только они; фильтр по workouts_count после annotate работает как HAVING.
     active_users = (
-        User.objects.filter(workouts__is_cancelled=False)
+        User.objects.filter(workouts__status__in=("active", "completed"))
         .annotate(
             workouts_count=Count("workouts"),
             total_minutes=Sum("workouts__duration_min"),
@@ -214,6 +205,11 @@ def statistics(request):
 
     context = {
         "summary": summary,
+        "status_summary": Workout.objects.aggregate(
+            active=Count("pk", filter=Q(status=Workout.Status.ACTIVE)),
+            cancelled=Count("pk", filter=Q(status=Workout.Status.CANCELLED)),
+            completed=Count("pk", filter=Q(status=Workout.Status.COMPLETED)),
+        ),
         "exercise_popularity": exercise_popularity,
         "muscle_group_tonnage": muscle_group_tonnage,
         "active_users": active_users,

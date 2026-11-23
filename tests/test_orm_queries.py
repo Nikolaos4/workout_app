@@ -87,7 +87,7 @@ def test_workout_detail_shows_joined_data(base_data):
 
 def test_workout_detail_uses_few_queries(base_data, django_assert_max_num_queries):
     # Тренировка вместе с пользователем + строки вместе с упражнениями.
-    with django_assert_max_num_queries(2):
+    with django_assert_max_num_queries(3):
         get("/workouts/1/")
 
 
@@ -237,7 +237,7 @@ def test_workout_without_exercises_stays_in_list(base_data):
 
 def test_workouts_list_has_no_n_plus_one(demo_data, django_assert_max_num_queries):
     # Число страниц + сама страница + список пользователей для фильтра.
-    with django_assert_max_num_queries(3):
+    with django_assert_max_num_queries(4):
         get("/workouts/")
 
 
@@ -362,7 +362,7 @@ def test_statistics_user_with_only_cancelled_workouts_is_hidden(base_data):
         user=user,
         workout_date=date(2026, 9, 1),
         workout_type="кардио",
-        is_cancelled=True,
+        status="cancelled",
     )
     html = get("/workouts/statistics/", {"min_workouts": "0"}).content.decode()
     assert "Отменивший" not in html

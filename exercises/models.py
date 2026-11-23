@@ -15,6 +15,24 @@ class Exercise(models.Model):
         verbose_name="Группа мышц",
     )
 
+    slug = models.SlugField(
+        max_length=220, unique=True, blank=True, verbose_name="Адрес на английском"
+    )
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            import uuid
+            from django.utils.text import slugify
+
+            base = slugify(self.name) or "exercise"
+            self.slug = f"{base[:180]}-{uuid.uuid4().hex[:12]}"
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+
+        return reverse("exercises:detail_slug", kwargs={"slug": self.slug})
+
     def __str__(self):
         return self.name
 

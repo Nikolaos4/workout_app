@@ -9,7 +9,7 @@
         </p>
 
         <a
-            href="{% url 'exercises:detail' exercise.id %}"
+            href="{{ exercise.get_absolute_url }}"
             class="btn btn-primary"
         >
             Подробнее

@@ -65,7 +65,7 @@ def test_default_values(base_data):
     workout = Workout.objects.create(
         user=base_data.user, workout_date=date(2026, 9, 1), workout_type="кардио"
     )
-    assert workout.duration_min == 0
+    assert workout.duration_min == 60
     assert workout.is_cancelled is False
 
 

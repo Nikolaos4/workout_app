@@ -14,8 +14,13 @@ from django.db.models import Q
 from django.utils import timezone
 
 
+from .querysets import WorkoutQuerySet
+
+
 class Workout(models.Model):
     """Тренировка пользователя на определённую дату."""
+
+    objects = WorkoutQuerySet.as_manager()
 
     class WorkoutType(models.TextChoices):
         CARDIO = "кардио", "Кардио"
@@ -38,11 +43,24 @@ class Workout(models.Model):
         default=60,
         verbose_name="Длительность, мин",
     )
-    # «Мягкая» отмена: запись остаётся в базе, но не входит в статистику.
-    is_cancelled = models.BooleanField(
-        default=False,
-        verbose_name="Тренировка отменена",
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "активна"
+        CANCELLED = "cancelled", "Отменена"
+        COMPLETED = "completed", "Завершена"
+
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+        verbose_name="Статус",
     )
+
+    @property
+    def is_cancelled(self):
+        """Совместимость шаблонов ПР9; значение определяется статусом."""
+        return self.status == self.Status.CANCELLED
+
     exercises = models.ManyToManyField(
         "exercises.Exercise",
         through="WorkoutExercise",
@@ -59,8 +77,8 @@ class Workout(models.Model):
 
     def cancel(self):
         """Отменить тренировку и сохранить только изменённое поле."""
-        self.is_cancelled = True
-        self.save(update_fields=["is_cancelled"])
+        self.status = self.Status.CANCELLED
+        self.save(update_fields=["status"])
 
     def __str__(self):
         return f"{self.workout_date:%d.%m.%Y} — {self.workout_type} ({self.user})"

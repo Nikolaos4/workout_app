@@ -65,7 +65,7 @@ def demo_data(base_data):
             workout_date=day,
             workout_type=kind,
             duration_min=minutes,
-            is_cancelled=cancelled,
+            status="cancelled" if cancelled else "active",
         )
     bench, squat, curl = base_data.bench, base_data.squat, base_data.curl
     WorkoutExercise.objects.bulk_create(

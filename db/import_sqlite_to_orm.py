@@ -86,7 +86,11 @@ def import_all(source_path: Path = SOURCE_DB) -> dict[str, int]:
                     "workout_date": date.fromisoformat(row["workout_date"]),
                     "workout_type": row["workout_type"],
                     "duration_min": row["duration_min"],
-                    "is_cancelled": bool(row["is_cancelled"]),
+                    "status": (
+                        Workout.Status.CANCELLED
+                        if row["is_cancelled"]
+                        else Workout.Status.ACTIVE
+                    ),
                 },
             )
         for row in items:

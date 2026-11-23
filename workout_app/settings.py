@@ -1,3 +1,5 @@
+import os
+
 """
 Django settings for workout_app project.
 
@@ -64,6 +66,7 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
+                "homepage.context_processors.site_context",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
@@ -125,3 +128,11 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Панель диагностики включается явно только для локальной разработки.
+
+ENABLE_DEBUG_TOOLBAR = DEBUG and os.environ.get("ENABLE_DEBUG_TOOLBAR") == "1"
+if ENABLE_DEBUG_TOOLBAR:
+    INSTALLED_APPS += ["debug_toolbar"]
+    MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
+    INTERNAL_IPS = ["127.0.0.1", "::1"]

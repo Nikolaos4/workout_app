@@ -5,6 +5,7 @@
 {% endblock %}
 
 {% block content %}
+<p>Активных: {{ status_summary.active }} · Отменённых: {{ status_summary.cancelled }} · Завершённых: {{ status_summary.completed }}</p>
     <h1>Статистика тренировок</h1>
     <p class="text-muted">Учитываются только активные (не отменённые) тренировки.</p>
 

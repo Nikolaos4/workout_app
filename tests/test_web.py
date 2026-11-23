@@ -107,7 +107,9 @@ def test_exercises_list_uses_include_and_length_filter():
     html = get("/exercises/").content.decode()
     assert "Всего упражнений: 3" in html
     assert 'class="card exercise-card mb-3"' in html
-    assert 'href="/exercises/1/"' in html
+    from exercises.models import Exercise
+
+    assert f'href="{Exercise.objects.get(pk=1).get_absolute_url()}"' in html
 
 
 def test_workout_status_include_shows_active_state():
