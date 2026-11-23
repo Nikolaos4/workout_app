@@ -136,3 +136,7 @@ if ENABLE_DEBUG_TOOLBAR:
     INSTALLED_APPS += ["debug_toolbar"]
     MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
     INTERNAL_IPS = ["127.0.0.1", "::1"]
+
+# Пользовательские загрузки отделены от static.
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"

@@ -1,16 +1,18 @@
 """View-функции приложения workouts: данные берутся через Django ORM (ПР9)."""
 
-from datetime import date
-from django.shortcuts import render, get_object_or_404
 from django.core.paginator import Paginator
 from django.db.models import Avg, Count, F, FloatField, Max, Min, Q, Sum
 from django.db.models.functions import Coalesce
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib import messages
+from django.db import transaction
+from django.views.decorators.http import require_POST, require_http_methods
 
 from exercises.models import Exercise
 from users.models import User
 
 from .models import Workout, WorkoutExercise
+from .forms import WorkoutFilterForm, WorkoutForm, WorkoutExerciseFormSet
 
 # Сколько тренировок показывать на одной странице списка.
 PAGE_SIZE = 5
@@ -34,21 +36,6 @@ SORT_LABELS = {
 DEFAULT_SORT = "date"
 
 
-def _parse_date(value):
-    """Вернуть дату или None, если строка не в формате ГГГГ-ММ-ДД."""
-    try:
-        return date.fromisoformat(value)
-    except ValueError:
-        return None
-
-
-def _parse_id(value):
-    """Вернуть целый идентификатор из строки или None, если это не число."""
-    if value.isascii() and value.isdigit() and len(value) <= 9:
-        return int(value)
-    return None
-
-
 def _tonnage(prefix=""):
     """Сумма «подходы × повторения × вес»; prefix — путь до строк упражнений."""
     return Sum(
@@ -63,19 +50,19 @@ def workouts(request):
     GET-параметры: active=1 (только активные), start и end (период дат),
     q (поиск по имени пользователя и типу), type, user, sort, page.
     """
-    only_active = request.GET.get("active") == "1"
-    start_raw = request.GET.get("start", "")
-    end_raw = request.GET.get("end", "")
-    query = request.GET.get("q", "").strip()
-    type_raw = request.GET.get("type", "")
-    user_raw = request.GET.get("user", "")
-    sort = request.GET.get("sort", DEFAULT_SORT)
-    if sort not in SORT_FIELDS:
-        sort = DEFAULT_SORT
-
-    start = _parse_date(start_raw) if start_raw else None
-    end = _parse_date(end_raw) if end_raw else None
-    invalid_dates = (start_raw and start is None) or (end_raw and end is None)
+    form = WorkoutFilterForm(request.GET)
+    form.is_valid()
+    # Используем только поля, прошедшие очистку. Ошибочные необязательные
+    # селекторы игнорируются как в ПР10, но теперь показывают ошибки формы.
+    data = form.cleaned_data
+    only_active = data.get("active", False)
+    start, end = data.get("start"), data.get("end")
+    query = data.get("q", "")
+    type_raw = data.get("type", "")
+    user_id = data.get("user")
+    sort = data.get("sort") or DEFAULT_SORT
+    invalid_dates = bool(form.errors.get("start") or form.errors.get("end"))
+    invalid_period = bool(form.non_field_errors())
 
     # select_related загружает пользователя тем же запросом (JOIN), а
     # annotate считает для каждой тренировки число упражнений и тоннаж.
@@ -100,10 +87,9 @@ def workouts(request):
         )
     if type_raw in Workout.WorkoutType.values:
         queryset = queryset.filter(workout_type=type_raw)
-    user_id = _parse_id(user_raw)
     if user_id is not None:
         queryset = queryset.filter(user_id=user_id)
-    if invalid_dates:
+    if invalid_dates or invalid_period:
         queryset = Workout.objects.none()
 
     paginator = Paginator(queryset.order_by(*SORT_FIELDS[sort]), PAGE_SIZE)
@@ -115,15 +101,8 @@ def workouts(request):
         "page_obj": page_obj,
         "total": paginator.count,
         "only_active": only_active,
-        "start": start_raw,
-        "end": end_raw,
-        "q": query,
-        "selected_type": type_raw,
-        "selected_user": user_raw,
+        "form": form,
         "sort": sort,
-        "sort_options": SORT_LABELS.items(),
-        "workout_types": Workout.WorkoutType.choices,
-        "users": User.objects.order_by("name"),
         "invalid_dates": invalid_dates,
     }
 
@@ -140,9 +119,7 @@ def workout_detail(request, workout_id):
         pk=workout_id,
     )
 
-    items = workout.workout_exercises.select_related(
-        "exercise"
-    ).order_by("pk")
+    items = workout.workout_exercises.select_related("exercise").order_by("pk")
 
     return render(
         request,
@@ -152,6 +129,7 @@ def workout_detail(request, workout_id):
             "items": items,
         },
     )
+
 
 def statistics(request):
     """Страница /workouts/statistics/: статистика по активным тренировкам.
@@ -221,3 +199,63 @@ def statistics(request):
         "workouts/statistics.html",
         context,
     )
+
+
+@require_http_methods(["GET", "POST"])
+def workout_create(request):
+    return _workout_form(request)
+
+
+@require_http_methods(["GET", "POST"])
+def workout_edit(request, workout_id):
+    workout = get_object_or_404(Workout, pk=workout_id)
+    return _workout_form(request, workout)
+
+
+def _workout_form(request, workout=None):
+    creating = workout is None
+    instance = workout if workout is not None else Workout()
+    form = WorkoutForm(
+        request.POST if request.method == "POST" else None, instance=instance
+    )
+    formset = WorkoutExerciseFormSet(
+        request.POST if request.method == "POST" else None,
+        instance=instance,
+        prefix="items",
+    )
+    if request.method == "POST":
+        form_valid = form.is_valid()
+        rows_valid = formset.is_valid()
+        if form_valid and rows_valid:
+            with transaction.atomic():
+                saved = form.save(commit=False)
+                if creating:
+                    saved.status = Workout.Status.ACTIVE
+                saved.save()
+                formset.instance = saved
+                formset.save()
+            messages.success(
+                request, "Тренировка создана." if creating else "Тренировка изменена."
+            )
+            return redirect("workouts:detail", workout_id=saved.pk)
+    return render(
+        request,
+        "workouts/workout_form.html",
+        {
+            "form": form,
+            "formset": formset,
+            "workout": workout,
+            "title": "Создать тренировку" if creating else "Редактировать тренировку",
+        },
+    )
+
+
+@require_POST
+def workout_cancel(request, workout_id):
+    workout = get_object_or_404(Workout, pk=workout_id)
+    if workout.status == Workout.Status.ACTIVE:
+        workout.cancel()
+        messages.success(request, "Тренировка отменена. Запись сохранена в истории.")
+    else:
+        messages.info(request, "Отменить можно только активную тренировку.")
+    return redirect("workouts:detail", workout_id=workout.pk)

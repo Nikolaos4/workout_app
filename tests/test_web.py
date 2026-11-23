@@ -69,7 +69,7 @@ def test_workout_detail_page_shows_related_objects():
 def test_workout_detail_not_found_returns_404():
     response = get("/workouts/999/")
     assert response.status_code == 404
-    assert "Тренировка не найдена" in response.content.decode()
+    assert "404 – страница не найдена" in response.content.decode()
 
 
 @override_settings(DEBUG=False)
