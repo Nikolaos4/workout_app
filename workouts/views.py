@@ -45,55 +45,57 @@ def _tonnage(prefix=""):
 
 
 def workouts(request):
-    """Страница /workouts/: список тренировок с фильтрами, сортировкой и страницами.
-
-    GET-параметры: active=1 (только активные), start и end (период дат),
-    q (поиск по имени пользователя и типу), type, user, sort, page.
-    """
+    """Список тренировок с фильтрами, сортировкой и пагинацией."""
     form = WorkoutFilterForm(request.GET)
-    form.is_valid()
-    # Используем только поля, прошедшие очистку. Ошибочные необязательные
-    # селекторы игнорируются как в ПР10, но теперь показывают ошибки формы.
-    data = form.cleaned_data
-    only_active = data.get("active", False)
-    start, end = data.get("start"), data.get("end")
-    query = data.get("q", "")
-    type_raw = data.get("type", "")
-    user_id = data.get("user")
-    sort = data.get("sort") or DEFAULT_SORT
-    invalid_dates = bool(form.errors.get("start") or form.errors.get("end"))
-    invalid_period = bool(form.non_field_errors())
 
-    # select_related загружает пользователя тем же запросом (JOIN), а
-    # annotate считает для каждой тренировки число упражнений и тоннаж.
-    # Тренировки без упражнений остаются в списке (с нулями).
-    queryset = Workout.objects.select_related("user").annotate(
-        exercises_count=Count("workout_exercises"),
-        tonnage=Coalesce(
-            _tonnage("workout_exercises__"), 0.0, output_field=FloatField()
-        ),
-    )
+    only_active = False
+    sort = DEFAULT_SORT
+    queryset = Workout.objects.none()
 
-    if only_active:
-        queryset = queryset.active()
-    if start:
-        queryset = queryset.filter(workout_date__gte=start)
-    if end:
-        queryset = queryset.filter(workout_date__lte=end)
-    if query:
-        # Поиск по нескольким полям, в том числе по полю связанной модели.
-        queryset = queryset.filter(
-            Q(user__name__icontains=query) | Q(workout_type__icontains=query)
+    if form.is_valid():
+        data = form.cleaned_data
+        only_active = data.get("active", False)
+        sort = data.get("sort") or DEFAULT_SORT
+
+        queryset = Workout.objects.select_related("user").annotate(
+            exercises_count=Count("workout_exercises"),
+            tonnage=Coalesce(
+                _tonnage("workout_exercises__"),
+                0.0,
+                output_field=FloatField(),
+            ),
         )
-    if type_raw in Workout.WorkoutType.values:
-        queryset = queryset.filter(workout_type=type_raw)
-    if user_id is not None:
-        queryset = queryset.filter(user_id=user_id)
-    if invalid_dates or invalid_period:
-        queryset = Workout.objects.none()
 
-    paginator = Paginator(queryset.order_by(*SORT_FIELDS[sort]), PAGE_SIZE)
-    # get_page не падает: неверный номер страницы заменяется ближайшим верным.
+        if only_active:
+            queryset = queryset.active()
+
+        if data.get("start"):
+            queryset = queryset.filter(
+                workout_date__gte=data["start"],
+            )
+
+        if data.get("end"):
+            queryset = queryset.filter(
+                workout_date__lte=data["end"],
+            )
+
+        if data.get("q"):
+            query = data["q"]
+            queryset = queryset.filter(
+                Q(user__name__icontains=query)
+                | Q(workout_type__icontains=query)
+            )
+
+        if data.get("type"):
+            queryset = queryset.filter(workout_type=data["type"])
+
+        if data.get("user") is not None:
+            queryset = queryset.filter(user_id=data["user"])
+
+    paginator = Paginator(
+        queryset.order_by(*SORT_FIELDS[sort]),
+        PAGE_SIZE,
+    )
     page_obj = paginator.get_page(request.GET.get("page"))
 
     context = {
@@ -103,7 +105,9 @@ def workouts(request):
         "only_active": only_active,
         "form": form,
         "sort": sort,
-        "invalid_dates": invalid_dates,
+        "invalid_dates": bool(
+            form.errors.get("start") or form.errors.get("end")
+        ),
     }
 
     return render(
