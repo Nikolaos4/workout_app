@@ -14,6 +14,10 @@
             <div class="card-body">
                 <h1 class="card-title h5">{{ exercise.name}}</h1>
 
+                {% if exercise.image %}
+                <img src="{{ exercise.image.url }}" alt="{{ exercise.name }}" class="img-fluid rounded mb-3" style="max-height: 360px">
+                {% endif %}
+                <p><a class="btn btn-outline-primary" href="{% url 'exercises:edit' exercise.id %}">Редактировать упражнение</a></p>
                 <p class="card-text">
                     <strong>ID:</strong> {{ exercise.id }}
                 </p>

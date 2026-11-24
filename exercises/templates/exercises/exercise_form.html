@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% include "includes/form_fields.html" %}
+    <button type="submit" class="btn btn-primary">Сохранить</button>
+    <a href="{% url 'exercises:list' %}" class="btn btn-outline-secondary">К списку упражнений</a>
+</form>
+{% endblock %}

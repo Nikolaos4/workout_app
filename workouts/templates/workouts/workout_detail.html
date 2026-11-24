@@ -33,6 +33,12 @@
                     {% include "workouts/includes/workout_status.html" %}
                 </p>
 
+                <a class="btn btn-outline-primary mb-3" href="{% url 'workouts:edit' workout.id %}">Редактировать</a>
+                {% if workout.status == 'active' %}
+                <form method="post" action="{% url 'workouts:cancel' workout.id %}" class="mb-3">
+                    {% csrf_token %}<button class="btn btn-outline-danger" type="submit">Отменить тренировку</button>
+                </form>
+                {% endif %}
                 <p class="card-text">Выполненные упражнения:</p>
                 <ul class="list-group mb-3">
                     {% for item in items %}

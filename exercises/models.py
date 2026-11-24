@@ -15,6 +15,12 @@ class Exercise(models.Model):
         verbose_name="Группа мышц",
     )
 
+    image = models.ImageField(
+        upload_to="exercises/%Y/%m/",
+        blank=True,
+        verbose_name="Изображение упражнения",
+    )
+
     slug = models.SlugField(
         max_length=220, unique=True, blank=True, verbose_name="Адрес на английском"
     )

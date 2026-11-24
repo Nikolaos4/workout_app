@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<form method="post" novalidate>
+    {% csrf_token %}
+    {% include "includes/form_fields.html" %}
+    <h2 class="h4">Выполненные упражнения</h2>
+    <p>Добавьте хотя бы одно упражнение. Отметка «Удалить» убирает строку при сохранении.</p>
+    {{ formset.management_form }}
+    {{ formset.management_form.errors }}
+    {% if formset.non_form_errors %}<div class="alert alert-danger">{{ formset.non_form_errors }}</div>{% endif %}
+    <div id="exercise-rows">
+    {% for row in formset %}
+        <fieldset class="border rounded p-3 mb-3"><legend class="h6">Упражнение {{ forloop.counter }}</legend>
+            {% include "includes/form_fields.html" with form=row %}
+        </fieldset>
+    {% endfor %}
+    </div>
+    <template id="empty-exercise"><fieldset class="border rounded p-3 mb-3"><legend class="h6">Новое упражнение</legend>
+        {% include "includes/form_fields.html" with form=formset.empty_form %}
+    </fieldset></template>
+    <button type="button" id="add-exercise" class="btn btn-outline-secondary mb-3">Добавить строку упражнения</button>
+    <div><button class="btn btn-primary" type="submit">Сохранить</button>
+    <a class="btn btn-outline-secondary" href="{% url 'workouts:list' %}">К списку тренировок</a></div>
+</form>
+{% load static %}<script src="{% static 'homepage/js/workout_form.js' %}" defer></script>
+{% endblock %}

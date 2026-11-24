@@ -1,6 +1,10 @@
 """View-функции приложения exercises: данные берутся через Django ORM (ПР9)."""
 
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib import messages
+from django.views.decorators.http import require_http_methods
+
+from .forms import ExerciseForm
 
 from .models import Exercise
 
@@ -97,4 +101,35 @@ def exercise_search(request):
         request,
         "exercises/exercise_search.html",
         context,
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def exercise_create(request):
+    return _exercise_form(request)
+
+
+@require_http_methods(["GET", "POST"])
+def exercise_edit(request, exercise_id):
+    return _exercise_form(request, get_object_or_404(Exercise, pk=exercise_id))
+
+
+def _exercise_form(request, exercise=None):
+    form = ExerciseForm(
+        request.POST if request.method == "POST" else None,
+        request.FILES if request.method == "POST" else None,
+        instance=exercise,
+    )
+    if request.method == "POST" and form.is_valid():
+        saved = form.save()
+        messages.success(request, "Упражнение сохранено.")
+        return redirect(saved)
+    return render(
+        request,
+        "exercises/exercise_form.html",
+        {
+            "form": form,
+            "exercise": exercise,
+            "title": "Редактировать упражнение" if exercise else "Добавить упражнение",
+        },
     )
